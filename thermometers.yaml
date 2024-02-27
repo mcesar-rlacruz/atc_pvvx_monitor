@@ -258,7 +258,7 @@
             data:       '%(rssi)i'
     # another Domoticz client via MQTT
     -   hostname:   localhost
-        port:       8080
+        port:       8883
         user:       my_new_user_name
         password:   my_new_secret_password
         encrypt:    yes
