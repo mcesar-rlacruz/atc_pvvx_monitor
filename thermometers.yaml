@@ -1,0 +1,268 @@
+# YAML format, DO NOT USE TABS, BUT SPACES!!
+
+# Can put (line) comments where you want, starting each comment with a #.
+#
+# This file describes each thermometer to listen and also the clients to where
+#   to publish their measurements. The data serialization format used in this
+#   file is YAML, see https://en.wikipedia.org/wiki/YAML. 
+#
+# Thermometers must be flashed with either:
+#       * atc1441 firmware: https://github.com/atc1441/ATC_MiThermometer
+#       * pvvx firmware:    https://github.com/pvvx/ATC_MiThermometer
+#
+# The script is able to (passively) listen and decode these thermometers BLE
+#   advertisements and, then, report the measured data to Domoticz (via its
+#   http/https JSON based API) or to MQTT brokers (with customizable topics and
+#   message formats). This customization allows reporting the measurements to
+#   Domoticz via MQTT. Authentication and encryption for these communications
+#   are supported.
+#
+# To listen for a thermometer not encrypting its measurements, only its MAC
+#   address is needed. For encrypting thermometers, a decrypting key must be
+#   provided. The script automatically discerns the kind of firmware on the
+#   thermometer and also if it is using encryption or not.
+#
+# Each thermometer is identified by its MAC address, and the fields describing
+#   each thermometer are:
+#       *   name:       a nonrequired field stating a (useful to you) name for the thermometer,
+#                           used only in logging messages.
+#       *   key:        mandatory for thermometers encrypting their advertisements. It is the
+#                           EEP key set via Telink Flasher (https://pvvx.github.io/ATC_MiThermometer/TelinkMiFlasher.html),
+#                           a 128 bit hex number.
+#       *   bat_soc:    a boolean (YAML booleans are true/yes/on and false/no/off) stating
+#                           if the battery level will be reported as % of voltage or as State
+#                           of Charge, that gives better battery life estimates. Defaults to
+#                           off.
+#       *   clients:    an list of clients (Domoticz or MQTT) to where to publish measurements
+#                           to. Will be described later.
+#                           
+#   For example:
+#
+# # my thermometer
+# 11-22-33-44-55-66:                                      # thermometer MAC address, case insensitive, can use
+#                                                             # colons, dashes and underscores (mandatory field)
+#     name:           TEMP_ON_ROOM                        # a name given to this device that is useful to you
+#     key:            0123456789abcdef0123456789ABCDEF    # decryption key, case insensitive
+#     batt_soc:       on                                  # report battery level as SoC
+#     clients:                                            # to be described next
+#
+# Field "clients" is an list describing all clients to where to publish the
+#   measurements from each thermometer, its sub-fields are:
+#       *   hostname:   the hostname of the client (required).
+#       *   port:       the port where the client listens. Defaults to 80 or 8080 for
+#                           Domoticz clients (non-encrypted and encrypted, respectively) and
+#                           1883 or 8883 (ditto) for MQTT brokers.
+#       *   user:       the user name, in case the client needs authentication.
+#       *   password:   the password, in case the client needs authentication.
+#       *   encrypt:    boolean (defaults to yes), set to use TLS.
+#       *   insecure:   boolean (defaults to no), set in order to not check certificate
+#                           hostname. Only used with encrypted clients.
+#       *   idx:        required for Domoticz clients. Specifies the idx number of the
+#                           Domoticz device for this thermometer.
+#       *   topic:      MQTT topic where to publish the measurements.
+#       *   payloads:   required for MQTT clients, describes the messages to publish
+#                           into the previous topic. More on this later.
+#
+# Note that the presence/absence of fields "idx" and "payloads" is used to distinguish
+#   between Domoticz (have "idx" field) and MQTT (have "payloads" field). Clients
+#   having both (or none) of "idx" and "payloads" fields are invalid.
+#
+# Continuing with the previous example:
+#
+# # my thermometer
+# 11-22-33-44-55-66:
+#     name:           TEMP_ON_ROOM
+#     key:            0123456789abcdef0123456789ABCDEF
+#     batt_soc:       on
+#     clients:
+#     -   hostname:   127.0.0.1
+#         user:       my_user_name
+#         password:   my_secret_password
+#         insecure:   yes
+#         idx:        25
+#
+# will publish measurements from this thermometer to a Domoticz client at address
+#   127.0.0.1, using TLS (so using https on port 8080), insecurely (will not check the
+#   hostname in the certificate provided by the client), using authentication
+#   (my_user_name:my_secret_password) and updating device with idx 25 in Domoticz.
+#   For Domoticz clients, all temperature, humidity, battery level and RSSI (with a
+#   number from 0 —no signal— to 11 —full signal—) will be reported.
+#
+# MQTT clients contain a "payloads" field describing all data to be published. It
+#   is a list of payloads, each consisting of two fields:
+#       *   subtopic:   a subtopic to concatenate (using a dash "/") with the previously
+#                           described "topic" field.
+#       *   data:       a string conforming a template where to include the measurement
+#                           data. On it, you can access variables; temperature (ºC, with
+#                           decimals); humidity (%, with decimals); battery (%, integer);
+#                           rssi (dBm, integer); and rssi_11 (0-11, integer)}, enclosing
+#                           each one inside parenthesis preceded by a % sign —e.g. %(temperature)—.
+#                           Must also add, after the closing parenthesis, a format specification
+#                           (see https://docs.python.org/3/library/string.html#format-specification-mini-language).
+#                           Thus, in the example below '%(humidity)i' means "humidity value
+#                           as an integer" and '%(temperature).2f' means "temperature value to
+#                           two decimal places".
+#
+# Now can add a MQTT client to the previous thermometer with:
+#
+# # my thermometer
+# 11-22-33-44-55-66:
+#     name:           TEMP_ON_ROOM
+#     key:            0123456789abcdef0123456789ABCDEF
+#     batt_soc:       on
+#     clients:
+#     -   hostname:   127.0.0.1
+#         user:       my_user_name
+#         password:   my_secret_password
+#         insecure:   yes
+#         idx:        25
+#     -   hostname:   my_client.xyz
+#         port:       63211
+#         user:       my_other_user_name
+#         password:   my_other_secret_password
+#         topic:      sensor/exterior
+#         payloads:
+#         -   subtopic:   temperature
+#             data:       '%(temperature).2f'
+#         -   subtopic:   humidity
+#             data:       '%(humidity)i'
+#         -   subtopic:   battery
+#             data:       '%(battery)i'
+#         -   subtopic:   rssi
+#             data:       '%(rssi)i'
+#
+# that will publish to MQTT broker my_client.xyz, using port 63211, using TLS
+#   (checking client certificate hostname), using authentication, into topics:
+#       * sensor/exterior/temperature   the temperature as a float number
+#                                           with 2 decimal places
+#       * sensor/exterior/humidity      the relative humidity as an integer 0-100
+#       * sensor/exterior/battery       the battery level as an integer 0-100
+#       * sensor/exterior/rssi          the received signal level as an integer
+#                                           (in dBm).
+#
+# Of course, the previous example will still also publish, as before, the same
+#   data to the Domoticz client (here "clients" is a list with 2 elements, the
+#   same way that "payloads" is a list with 4 elements)
+#
+# In case you want to publish some measurements to Domoticz using its MQTT facilities,
+#   you can:
+#
+# # my thermometer
+# 11-22-33-44-55-66:
+#     name:           TEMP_ON_ROOM
+#     key:            0123456789abcdef0123456789ABCDEF
+#     batt_soc:       on
+#     clients:
+#     -   hostname:   127.0.0.1
+#         user:       my_user_name
+#         password:   my_secret_password
+#         insecure:   yes
+#         idx:        25
+#     -   hostname:   my_client.xyz
+#         port:       63211
+#         user:       my_user_name
+#         password:   my_secret_password
+#         topic:      sensor/exterior
+#         payloads:
+#         -   subtopic:   temperature
+#             data:       '%(temperature).2f'
+#         -   subtopic:   humidity
+#             data:       '%(humidity)i'
+#         -   subtopic:   battery
+#             data:       '%(battery)i'
+#         -   subtopic:   rssi
+#             data:       '%(rssi)i'
+#     -   hostname:   localhost
+#         encrypt:    no
+#         topic:      domoticz/in
+#         payloads:
+#         -   data:   '{"command": "udevice", "idx": 113, "nvalue": 0, "svalue": "%(temperature).2f;%(humidity)i;-1", "Battery": %(battery)i, "RSSI": %(rssi_11)i}'
+#
+# All these adds a third client (a MQTT one, as it has a "payloads" field), named
+#   "localhost", at port 1883 (non-encrypted, non-authenticated), publishing into
+#   topic "domoticz/in" (as expected by Domoticz), with a payload data that
+#   represents the information needed by Domoticz in its required JSON format.
+#   Note that, in this case, the "idx" of the Domoticz device to update (113)
+#   is coded directly into the "data" field of the payload.
+#
+# Note that, in previous examples, to ensure that the "data" field of each payload is
+#   a string, they are all enclosed with single quotes '. Otherwise, the last example
+#   will treat "data" as a hash (dict, if you prefer), as it would be
+#   enclosed by braces.
+#
+# Finally, the format of this file, YAML, allows the use of "anchors" (&) and
+#   "aliases" (*) that allow one to save some typing in case of repeated (even
+#   with little variations) fields. Suppose, for example, that want to publish,
+#   for a given thermometer, the same information to two different MQTT brokers,
+#   then:
+#
+# # my thermometer
+# 11-22-33-44-55-66:
+#     name:           TEMP_ON_ROOM
+#     key:            0123456789abcdef0123456789ABCDEF
+#     batt_soc:       on
+#     clients:
+#     -   &mqtt_garden                          # note the anchor &mqtt_garden to, later,
+#                                                   # refer to all info into this client
+#         hostname:   my_client.xyz
+#         port:       63211
+#         user:       my_other_user_name
+#         password:   my_other_secret_password
+#         topic:      sensor/exterior
+#         payloads:
+#         -   subtopic:   temperature
+#             data:       '%(temperature).2f'
+#         -   subtopic:   humidity
+#             data:       '%(humidity)i'
+#         -   subtopic:   battery
+#             data:       '%(battery)i'
+#         -   subtopic:   rssi
+#             data:       '%(rssi)i'
+#     -   <<:   *mqtt_garden                    # note the alias *mqtt_garden to refer to
+#                                                   # previous anchor, "copying" here all
+#                                                   # configuration from previous client...
+#         hostname:   192.168.0.58              # but overriding its "hostname" field
+#
+# That's all, now put below the configuration for each of the desired thermometers.
+
+# my thermometer
+11-22-33-44-55-66:
+    name:           TEMP_ON_ROOM
+    key:            0123456789abcdef0123456789ABCDEF
+    batt_soc:       on
+    clients:
+    # a Domoticz client
+    -   hostname:   127.0.0.1
+        port:       8080
+        user:       my_user_name
+        password:   my_secret_password
+        encrypt:    yes
+        insecure:   no
+        idx:        12345
+    # a MQTT broker
+    -   hostname:   my_client.xyz
+        port:       8883
+        user:       my_other_user_name
+        password:   my_other_secret_password
+        encrypt:    yes
+        insecure:   no
+        topic:      sensor/exterior
+        payloads:
+        -   subtopic:   temperature
+            data:       '%(temperature).2f'
+        -   subtopic:   humidity
+            data:       '%(humidity)i'
+        -   subtopic:   battery
+            data:       '%(battery)i'
+        -   subtopic:   rssi
+            data:       '%(rssi)i'
+    # another Domoticz client via MQTT
+    -   hostname:   localhost
+        port:       8080
+        user:       my_new_user_name
+        password:   my_new_secret_password
+        encrypt:    yes
+        insecure:   no
+        topic:      domoticz/in
+        payloads:
+        -   data:   '{"command": "udevice", "idx": 54321, "nvalue": 0, "svalue": "%(temperature).2f;%(humidity)i;-1", "Battery": %(battery)i, "RSSI": %(rssi_11)i}'

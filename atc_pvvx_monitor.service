@@ -1,0 +1,12 @@
+[Unit]
+Description=Monitor ambient temperature via BLE thermometers with ATC/pvvx firmware
+Wants=multi-user.target bluetooth.service
+After=bluetooth.service
+
+[Service]
+ExecStart=/usr/bin/python3 /home/pi/atc_pvvx_monitor.py -s11 -p50 -c /home/pi/thermometers.yaml
+ExecReload=/usr/bin/kill -HUP $MAINPID
+User=pi
+
+[Install]
+WantedBy=default.target
