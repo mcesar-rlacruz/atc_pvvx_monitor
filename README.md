@@ -125,9 +125,9 @@ options:
   -d, --date            include date into timestamps.
 ```
 
-All these options seem self-explanatory. Only `-s` and `-p` may require a comment. When scanning for BLE advertisements, some backends may block the  Bluetooth adapter for other uses. Thus, it may be required to scan for a given time and then release the adapter for some other time. Options `-s` and `-p` set these times (in s) respectively. If option `-s 0` is given, scanning never pauses. If your sensors have and advertisement period of, say, T seconds, a small multiple of T may be enough.
+All these options seem self-explanatory. Only `-s` and `-p` may require a comment. When passively scanning for BLE advertisements, some backends (Linux with some chipsets) report each BLE device only once. Thus, in order to continuously report advertisements from the same devices, it is necessary to scan for a while and then stop the scanning in order to relaunch it later. Options `-s` and `-p` set the duration (in s) of these scan and pause between scans periods respectively. If option `-s 0` is given, scanning never pauses. If your sensors have and advertisement period of, say, T seconds, a small multiple of T may be enough for `-s`. Test your system for expected behaviour before setting option `-s 0`.
 
-By default, the log does not contain timestamps. This is because, when run as a daemon/service, the log messages are managed by `journald`, that inserts them.
+By default, the log does not contain timestamps. This is because, when run as a daemon/service, the log messages are managed by `journald`, that inserts them. Inserting timestamps in the log may be controlled with options `-t` and `-d`.
 
 ## Configuration
 
